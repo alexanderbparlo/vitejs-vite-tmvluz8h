@@ -1,5 +1,65 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Coin {
+  id: string;
+  symbol: string;
+  name: string;
+  icon: string;
+  amount: number;
+  price: number;
+  change: number;
+  color: string;
+}
+
+interface MarketCoin {
+  symbol: string;
+  name: string;
+  icon: string;
+  price: number;
+  change: number;
+}
+
+interface ActivityItem {
+  type: string;
+  icon: string;
+  title: string;
+  sub: string;
+  time: string;
+}
+
+interface Chip {
+  label: string;
+  variant?: string;
+}
+
+interface Trade {
+  type: string;
+  symbol: string;
+  amount: number;
+  price: number;
+  confirmed?: boolean;
+}
+
+interface MessageContent {
+  type?: string;
+  text?: string;
+  chips?: Chip[];
+  trade?: Trade;
+}
+
+interface Message {
+  id: number;
+  role: string;
+  content: MessageContent;
+  ts: string;
+}
+
+interface Notification {
+  title: string;
+  body: string;
+}
+
 // ── Styles injected once ──────────────────────────────────────────────────────
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
@@ -49,7 +109,6 @@ const STYLES = `
   .glow-orb.a { width: 600px; height: 600px; background: var(--accent2); top: -200px; right: -200px; }
   .glow-orb.b { width: 400px; height: 400px; background: var(--accent); bottom: -150px; left: -100px; }
 
-  /* Header */
   .header {
     position: relative; z-index: 10;
     display: flex; align-items: center; justify-content: space-between;
@@ -92,7 +151,6 @@ const STYLES = `
   .coinbase-btn:hover { border-color: var(--accent); color: var(--accent); }
   .coinbase-btn.connected { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
 
-  /* Main layout */
   .main {
     position: relative; z-index: 1;
     display: grid;
@@ -102,7 +160,6 @@ const STYLES = `
     overflow: hidden;
   }
 
-  /* Panels */
   .panel {
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
@@ -125,7 +182,6 @@ const STYLES = `
   .panel-scroll::-webkit-scrollbar-track { background: transparent; }
   .panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  /* Portfolio Stats */
   .portfolio-value {
     padding: 18px 18px 12px;
     border-bottom: 1px solid var(--border);
@@ -139,7 +195,6 @@ const STYLES = `
   .pv-pct.neg { background: rgba(255,59,92,0.15); color: var(--red); }
   .pv-period { font-size: 10px; color: var(--muted); }
 
-  /* Holdings */
   .holding-card {
     padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
     border: 1px solid var(--border); background: var(--surface);
@@ -163,10 +218,8 @@ const STYLES = `
   .coin-chg.pos { color: var(--green); }
   .coin-chg.neg { color: var(--red); }
 
-  /* Mini sparkline */
   .sparkline { height: 30px; margin: 2px 0; }
 
-  /* Center – Chat */
   .chat-area {
     display: flex; flex-direction: column;
     background: var(--bg);
@@ -223,7 +276,6 @@ const STYLES = `
 
   .msg-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
 
-  /* Action chips inside messages */
   .action-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip {
     padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer;
@@ -235,7 +287,6 @@ const STYLES = `
   .chip.sell { border-color: rgba(255,59,92,0.4); color: var(--red); }
   .chip.warn { border-color: rgba(255,107,53,0.4); color: var(--warn); }
 
-  /* Trade confirmation card */
   .trade-card {
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 10px; padding: 14px; margin-top: 10px;
@@ -259,7 +310,6 @@ const STYLES = `
   .btn.cancel { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
   .btn.cancel:hover { border-color: var(--red); color: var(--red); }
 
-  /* Input area */
   .input-area {
     padding: 14px 18px; border-top: 1px solid var(--border);
     background: var(--surface); flex-shrink: 0;
@@ -292,7 +342,6 @@ const STYLES = `
   .send-btn:hover { transform: scale(1.05); }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-  /* Right panel – Market */
   .market-section { margin-bottom: 14px; }
   .market-section-title { font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-bottom: 8px; padding-left: 4px; }
 
@@ -310,7 +359,6 @@ const STYLES = `
   .market-chg.pos { color: var(--green); }
   .market-chg.neg { color: var(--red); }
 
-  /* Metrics */
   .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   .metric-card {
     background: var(--surface2); border: 1px solid var(--border);
@@ -320,14 +368,11 @@ const STYLES = `
   .metric-value { font-family: var(--font-display); font-size: 16px; font-weight: 800; }
   .metric-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
-  /* Fear & Greed */
   .fg-meter { text-align: center; padding: 12px; margin-bottom: 14px; }
-  .fg-arc { position: relative; width: 120px; height: 60px; margin: 0 auto 8px; }
   .fg-label { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
   .fg-name { font-size: 11px; color: var(--warn); font-weight: 700; }
   .fg-desc { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
-  /* Strategy alert */
   .strategy-alert {
     border: 1px solid rgba(255,107,53,0.3); background: rgba(255,107,53,0.06);
     border-radius: 8px; padding: 12px; margin-bottom: 10px;
@@ -335,21 +380,17 @@ const STYLES = `
   .sa-header { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--warn); margin-bottom: 6px; }
   .sa-body { font-size: 11px; color: var(--muted); line-height: 1.6; }
 
-  /* Typing indicator */
   .typing { display: flex; align-items: center; gap: 4px; padding: 8px 0; }
   .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.4; animation: typing 1.2s ease-in-out infinite; }
   .typing-dot:nth-child(2) { animation-delay: 0.2s; }
   .typing-dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes typing { 0%,100% { opacity: 0.4; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
 
-  /* Scrollbar */
   * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
-  /* Tag */
   .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 10px; letter-spacing: 1px; }
   .tag.live { background: rgba(0,212,170,0.15); color: var(--accent); }
 
-  /* Notification */
   .notif {
     position: fixed; bottom: 24px; right: 24px; z-index: 100;
     background: var(--surface); border: 1px solid var(--accent);
@@ -360,11 +401,9 @@ const STYLES = `
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   .notif-title { font-weight: 700; color: var(--accent); margin-bottom: 2px; }
 
-  /* Tab content */
   .tab-content { display: none; }
   .tab-content.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 
-  /* Activity feed */
   .activity-item {
     display: flex; gap: 10px; padding: 10px 0;
     border-bottom: 1px solid var(--border); align-items: flex-start;
@@ -380,31 +419,31 @@ const STYLES = `
 `;
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
-const PORTFOLIO = [
-  { id: "bitcoin", symbol: "BTC", name: "Bitcoin", icon: "₿", amount: 0.4821, price: 67240, change: 2.34, color: "#f7931a" },
-  { id: "ethereum", symbol: "ETH", name: "Ethereum", icon: "Ξ", amount: 3.2, price: 3480, change: -1.12, color: "#627eea" },
-  { id: "solana", symbol: "SOL", name: "Solana", icon: "◎", amount: 28, price: 178, change: 5.67, color: "#9945ff" },
-  { id: "cardano", symbol: "ADA", name: "Cardano", icon: "₳", amount: 2400, price: 0.612, change: -0.83, color: "#0033ad" },
-  { id: "chainlink", symbol: "LINK", name: "Chainlink", icon: "⬡", amount: 85, price: 14.2, change: 3.21, color: "#2a5ada" },
+const PORTFOLIO: Coin[] = [
+  { id: "bitcoin", symbol: "BTC", name: "Bitcoin", icon: "B", amount: 0.4821, price: 67240, change: 2.34, color: "#f7931a" },
+  { id: "ethereum", symbol: "ETH", name: "Ethereum", icon: "E", amount: 3.2, price: 3480, change: -1.12, color: "#627eea" },
+  { id: "solana", symbol: "SOL", name: "Solana", icon: "S", amount: 28, price: 178, change: 5.67, color: "#9945ff" },
+  { id: "cardano", symbol: "ADA", name: "Cardano", icon: "A", amount: 2400, price: 0.612, change: -0.83, color: "#0033ad" },
+  { id: "chainlink", symbol: "LINK", name: "Chainlink", icon: "L", amount: 85, price: 14.2, change: 3.21, color: "#2a5ada" },
 ];
 
-const MARKET = [
-  { symbol: "BTC", name: "Bitcoin", icon: "₿", price: 67240, change: 2.34 },
-  { symbol: "ETH", name: "Ethereum", icon: "Ξ", price: 3480, change: -1.12 },
-  { symbol: "SOL", name: "Solana", icon: "◎", price: 178, change: 5.67 },
-  { symbol: "BNB", name: "BNB", icon: "⬡", price: 592, change: 0.45 },
-  { symbol: "XRP", name: "XRP", icon: "✕", price: 0.624, change: -2.31 },
-  { symbol: "DOGE", name: "Dogecoin", icon: "Ð", price: 0.132, change: 8.12 },
-  { symbol: "AVAX", name: "Avalanche", icon: "▲", price: 38.4, change: -0.67 },
-  { symbol: "DOT", name: "Polkadot", icon: "●", price: 7.82, change: 1.23 },
+const MARKET: MarketCoin[] = [
+  { symbol: "BTC", name: "Bitcoin", icon: "B", price: 67240, change: 2.34 },
+  { symbol: "ETH", name: "Ethereum", icon: "E", price: 3480, change: -1.12 },
+  { symbol: "SOL", name: "Solana", icon: "S", price: 178, change: 5.67 },
+  { symbol: "BNB", name: "BNB", icon: "B", price: 592, change: 0.45 },
+  { symbol: "XRP", name: "XRP", icon: "X", price: 0.624, change: -2.31 },
+  { symbol: "DOGE", name: "Dogecoin", icon: "D", price: 0.132, change: 8.12 },
+  { symbol: "AVAX", name: "Avalanche", icon: "A", price: 38.4, change: -0.67 },
+  { symbol: "DOT", name: "Polkadot", icon: "P", price: 7.82, change: 1.23 },
 ];
 
-const ACTIVITIES = [
-  { type: "buy", icon: "↑", title: "Bought 0.05 BTC", sub: "Market order • $3,362", time: "2m ago" },
-  { type: "alert", icon: "⚡", title: "ETH Support Alert", sub: "Price testing $3,400 support", time: "18m ago" },
-  { type: "sell", icon: "↓", title: "Sold 5 SOL", sub: "Limit order filled • $890", time: "1h ago" },
-  { type: "buy", icon: "↑", title: "Bought 500 ADA", sub: "DCA strategy • $306", time: "3h ago" },
-  { type: "alert", icon: "⚡", title: "Portfolio ATH", sub: "New all-time high reached", time: "1d ago" },
+const ACTIVITIES: ActivityItem[] = [
+  { type: "buy", icon: "^", title: "Bought 0.05 BTC", sub: "Market order - $3,362", time: "2m ago" },
+  { type: "alert", icon: "!", title: "ETH Support Alert", sub: "Price testing $3,400 support", time: "18m ago" },
+  { type: "sell", icon: "v", title: "Sold 5 SOL", sub: "Limit order filled - $890", time: "1h ago" },
+  { type: "buy", icon: "^", title: "Bought 500 ADA", sub: "DCA strategy - $306", time: "3h ago" },
+  { type: "alert", icon: "!", title: "Portfolio ATH", sub: "New all-time high reached", time: "1d ago" },
 ];
 
 const QUICK_CMDS = [
@@ -416,26 +455,26 @@ const AI_GREET = `**Welcome to your Crypto Command Center.**
 
 I'm your AI portfolio manager with direct access to your Coinbase account. I can:
 
-**📊 Analyze** - Real-time portfolio metrics, P&L, risk exposure, correlations
-**🔍 Research** - Deep-dive analysis on any coin, on-chain data, sentiment
-**💡 Strategize** - DCA plans, momentum strategies, hedging recommendations  
-**⚡ Execute** - Buy/sell orders (I'll always confirm before executing)
-**🚨 Alert** - Proactive alerts on key price levels and market events
+**Portfolio Analysis** - Real-time metrics, P&L, risk exposure, correlations
+**Coin Research** - Deep-dive analysis on any coin, on-chain data, sentiment
+**Strategy** - DCA plans, momentum strategies, hedging recommendations
+**Trade Execution** - Buy/sell orders (I will always confirm before executing)
+**Alerts** - Proactive alerts on key price levels and market events
 
 Your portfolio is currently **up +4.2%** today. SOL is your best performer at **+5.67%**. ETH is your only red position at **-1.12%**.
 
 What would you like to do?`;
 
 // ── Sparkline SVG ─────────────────────────────────────────────────────────────
-function Sparkline({ positive }) {
-  const pts = Array.from({ length: 20 }, (_, i) => {
+function Sparkline({ positive }: { positive: boolean }) {
+  const pts = Array.from({ length: 20 }, (_: unknown, i: number) => {
     const base = 15;
     const trend = positive ? -i * 0.3 : i * 0.3;
     return base + trend + (Math.random() * 8 - 4);
   }).reverse();
   const min = Math.min(...pts), max = Math.max(...pts);
-  const norm = pts.map(p => 28 - ((p - min) / (max - min)) * 26);
-  const d = norm.map((y, x) => `${x === 0 ? "M" : "L"} ${(x / 19) * 100} ${y}`).join(" ");
+  const norm = pts.map((p: number) => 28 - ((p - min) / (max - min)) * 26);
+  const d = norm.map((y: number, x: number) => `${x === 0 ? "M" : "L"} ${(x / 19) * 100} ${y}`).join(" ");
   return (
     <svg className="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
       <path d={d} stroke={positive ? "#00d4aa" : "#ff3b5c"} strokeWidth="1.5" fill="none" />
@@ -444,7 +483,7 @@ function Sparkline({ positive }) {
 }
 
 // ── Trade Card ────────────────────────────────────────────────────────────────
-function TradeCard({ trade, onConfirm, onCancel }) {
+function TradeCard({ trade, onConfirm, onCancel }: { trade: Trade; onConfirm: (t: Trade) => void; onCancel: () => void }) {
   return (
     <div className="trade-card">
       <div className="trade-card-header">
@@ -464,22 +503,28 @@ function TradeCard({ trade, onConfirm, onCancel }) {
 }
 
 // ── Message Renderer ──────────────────────────────────────────────────────────
-function MessageContent({ content, onChipClick, onConfirm, onCancel }) {
-  if (content.type === "trade") {
+function MessageContent({ content, onChipClick, onConfirm, onCancel }: {
+  content: MessageContent;
+  onChipClick: (label: string) => void;
+  onConfirm: (t: Trade) => void;
+  onCancel: () => void;
+}) {
+  if (content.type === "trade" && content.trade) {
     return <TradeCard trade={content.trade} onConfirm={onConfirm} onCancel={onCancel} />;
   }
-  const formatted = content.text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+  const text = content.text ?? "";
+  const formatted = text
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/`(.*?)`/g, '<code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px;">$1</code>')
-    .replace(/\n/g, '<br/>');
+    .replace(/\n/g, "<br/>");
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: formatted }} />
       {content.chips && (
         <div className="action-chips">
-          {content.chips.map((c, i) => (
-            <button key={i} className={`chip ${c.variant || ""}`} onClick={() => onChipClick(c.label)}>
+          {content.chips.map((c: Chip, i: number) => (
+            <button key={i} className={`chip ${c.variant ?? ""}`} onClick={() => onChipClick(c.label)}>
               {c.label}
             </button>
           ))}
@@ -491,19 +536,18 @@ function MessageContent({ content, onChipClick, onConfirm, onCancel }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function CryptoAgent() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     { id: 1, role: "ai", content: { text: AI_GREET }, ts: "Just now" }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
-  const [selectedCoin, setSelectedCoin] = useState(null);
-  const [notification, setNotification] = useState(null);
-  const [pendingTrade, setPendingTrade] = useState(null);
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const conversationRef = useRef([]);
+  const [selectedCoin, setSelectedCoin] = useState<Coin | null>(null);
+  const [notification, setNotification] = useState<Notification | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const conversationRef = useRef<{ role: string; content: string }[]>([]);
 
   const totalValue = PORTFOLIO.reduce((s, c) => s + c.amount * c.price, 0);
 
@@ -511,14 +555,14 @@ export default function CryptoAgent() {
     const style = document.createElement("style");
     style.textContent = STYLES;
     document.head.appendChild(style);
-    return () => document.head.removeChild(style);
+    return () => { document.head.removeChild(style); };
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const showNotif = (title, body) => {
+  const showNotif = (title: string, body: string) => {
     setNotification({ title, body });
     setTimeout(() => setNotification(null), 4000);
   };
@@ -530,7 +574,6 @@ PORTFOLIO CONTEXT (live data):
 - Holdings: ${PORTFOLIO.map(c => `${c.symbol}: ${c.amount} units @ $${c.price} (${c.change > 0 ? "+" : ""}${c.change}% 24h)`).join(", ")}
 - Market Fear & Greed Index: 72 (Greed)
 - Connected exchange: Coinbase
-- Current date/time context: crypto markets active
 `;
 
   const SYSTEM_PROMPT = `You are an expert AI crypto portfolio manager and trading agent integrated with Coinbase. You have real-time access to the user's portfolio and market data.
@@ -539,25 +582,21 @@ ${portfolioContext}
 
 Your capabilities:
 1. ANALYSIS: Provide detailed technical, fundamental, and sentiment analysis
-2. STRATEGY: Suggest and implement DCA, momentum, mean-reversion, and other strategies  
-3. EXECUTION: When user wants to trade, always confirm with specifics before executing. Format trade requests with the exact structure needed.
+2. STRATEGY: Suggest and implement DCA, momentum, mean-reversion, and other strategies
+3. EXECUTION: When user wants to trade, always confirm with specifics before executing.
 4. ALERTS: Proactively flag risks, opportunities, and portfolio imbalances
 5. EDUCATION: Explain crypto concepts clearly
 
 Personality: Professional, data-driven, direct. Use crypto-native terminology. Be concise but thorough.
 
 IMPORTANT RULES:
-- ALWAYS confirm trades before "executing" – say you'll show a confirmation
-- When suggesting a trade, respond with: [TRADE: type=buy|sell, symbol=XXX, amount=N, price=CURRENT_PRICE, reason=...]
-- Use **bold** for emphasis, bullet points with hyphens
+- ALWAYS confirm trades before executing - say you will show a confirmation
+- When suggesting a trade, include: [TRADE: type=buy|sell, symbol=XXX, amount=N, price=CURRENT_PRICE]
+- Use **bold** for emphasis
 - Keep responses focused and actionable
-- When you recommend a trade, include the [TRADE:] tag in your response so the UI can parse it
-- Real price data is shown above – use it in your analysis
-- You can't actually connect to Coinbase in this demo, but simulate realistic trading interactions
+- Real price data is shown above - use it in your analysis`;
 
-Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=67240]`;
-
-  const parseTradeFromResponse = (text) => {
+  const parseTradeFromResponse = (text: string): Trade | null => {
     const match = text.match(/\[TRADE:\s*type=(\w+),\s*symbol=(\w+),\s*amount=([\d.]+),\s*price=([\d.]+)\]/);
     if (match) {
       return { type: match[1], symbol: match[2], amount: parseFloat(match[3]), price: parseFloat(match[4]) };
@@ -565,13 +604,15 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
     return null;
   };
 
-  const sendMessage = useCallback(async (text) => {
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
-    const userMsg = { id: Date.now(), role: "user", content: { text }, ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
+    const userMsg: Message = {
+      id: Date.now(), role: "user", content: { text },
+      ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
-
     conversationRef.current = [...conversationRef.current, { role: "user", content: text }];
 
     try {
@@ -590,45 +631,35 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
         }),
       });
       const data = await response.json();
-      const rawText = data.content?.[0]?.text || "I encountered an error. Please try again.";
-
+      const rawText: string = data.content?.[0]?.text ?? "I encountered an error. Please try again.";
       conversationRef.current = [...conversationRef.current, { role: "assistant", content: rawText }];
 
-      // Parse trade
       const trade = parseTradeFromResponse(rawText);
       const cleanText = rawText.replace(/\[TRADE:[^\]]+\]/g, "").trim();
 
-      // Build chips based on context
-      let chips = [];
-      if (rawText.toLowerCase().includes("buy") || rawText.toLowerCase().includes("purchase")) {
-        chips.push({ label: "Show me more analysis", variant: "" });
-      }
-      if (trade) {
-        chips.push({ label: "Confirm trade", variant: "buy" }, { label: "Cancel", variant: "sell" });
-      }
-      if (rawText.toLowerCase().includes("risk")) {
-        chips.push({ label: "Hedge my portfolio", variant: "warn" });
-      }
+      const chips: Chip[] = [];
+      if (rawText.toLowerCase().includes("buy")) chips.push({ label: "Show me more analysis" });
+      if (trade) { chips.push({ label: "Confirm trade", variant: "buy" }, { label: "Cancel", variant: "sell" }); }
+      if (rawText.toLowerCase().includes("risk")) chips.push({ label: "Hedge my portfolio", variant: "warn" });
 
-      const aiMsg = {
-        id: Date.now() + 1,
-        role: "ai",
-        content: { text: cleanText, chips: chips.length ? chips : undefined, trade: trade ? { ...trade, confirmed: false } : undefined },
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      const aiMsg: Message = {
+        id: Date.now() + 1, role: "ai",
+        content: { text: cleanText, chips: chips.length ? chips : undefined },
+        ts,
       };
 
       if (trade) {
-        aiMsg.content.type = undefined; // will show trade after text
-        setPendingTrade(trade);
         setMessages(prev => [...prev, aiMsg, {
           id: Date.now() + 2, role: "ai",
           content: { type: "trade", trade },
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          ts,
         }]);
       } else {
         setMessages(prev => [...prev, aiMsg]);
       }
-    } catch (err) {
+    } catch {
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: "ai",
         content: { text: "Network error. Please check your connection and try again." },
@@ -639,30 +670,30 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
     }
   }, [loading]);
 
-  const handleTradeConfirm = (trade) => {
-    setMessages(prev => prev.map(m =>
-      m.content?.type === "trade" ? { ...m, content: { ...m.content, confirmed: true } } : m
-    ));
-    showNotif("Order Submitted ✓", `${trade.type.toUpperCase()} ${trade.amount} ${trade.symbol} @ $${trade.price.toLocaleString()}`);
-    setPendingTrade(null);
+  const handleTradeConfirm = (trade: Trade) => {
+    setMessages(prev => prev.filter(m => m.content?.type !== "trade"));
+    showNotif("Order Submitted", `${trade.type.toUpperCase()} ${trade.amount} ${trade.symbol} @ $${trade.price.toLocaleString()}`);
+    const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     setMessages(prev => [...prev, {
       id: Date.now(), role: "ai",
-      content: { text: `✅ **Order submitted to Coinbase.** Your ${trade.type} order for **${trade.amount} ${trade.symbol}** at **$${trade.price.toLocaleString()}** has been placed. I'll notify you when it fills.\n\nWould you like me to set a price alert or stop-loss for this position?`, chips: [{ label: "Set stop-loss", variant: "warn" }, { label: "Set price alert", variant: "" }] },
-      ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      content: {
+        text: `**Order submitted to Coinbase.** Your ${trade.type} order for **${trade.amount} ${trade.symbol}** at **$${trade.price.toLocaleString()}** has been placed. I will notify you when it fills.\n\nWould you like me to set a price alert or stop-loss for this position?`,
+        chips: [{ label: "Set stop-loss", variant: "warn" }, { label: "Set price alert" }]
+      },
+      ts,
     }]);
   };
 
   const handleTradeCancel = () => {
-    setPendingTrade(null);
     setMessages(prev => prev.filter(m => m.content?.type !== "trade"));
     setMessages(prev => [...prev, {
       id: Date.now(), role: "ai",
-      content: { text: "Trade cancelled. Your portfolio is unchanged. Let me know if you'd like to explore other opportunities." },
+      content: { text: "Trade cancelled. Your portfolio is unchanged. Let me know if you would like to explore other opportunities." },
       ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }]);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
@@ -675,10 +706,9 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
       <div className="glow-orb a" />
       <div className="glow-orb b" />
 
-      {/* Header */}
       <header className="header">
         <div className="logo">
-          <div className="logo-icon">⬡</div>
+          <div className="logo-icon">N</div>
           <div>
             <div className="logo-text">NEXUS AI</div>
             <div className="logo-sub">CRYPTO PORTFOLIO AGENT</div>
@@ -692,18 +722,22 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
           <div className="tag live">AGENT ACTIVE</div>
           <button
             className={`coinbase-btn ${connected ? "connected" : ""}`}
-            onClick={() => { setConnected(!connected); showNotif(connected ? "Disconnected" : "Coinbase Connected ✓", connected ? "Coinbase account unlinked" : "Your Coinbase account is now linked"); }}
+            onClick={() => {
+              setConnected(!connected);
+              showNotif(
+                connected ? "Disconnected" : "Coinbase Connected",
+                connected ? "Coinbase account unlinked" : "Your Coinbase account is now linked"
+              );
+            }}
           >
-            <span>⬡</span>
-            {connected ? "● Coinbase Connected" : "Connect Coinbase"}
+            <span>C</span>
+            {connected ? "Coinbase Connected" : "Connect Coinbase"}
           </button>
         </div>
       </header>
 
-      {/* Main */}
       <main className="main">
-
-        {/* LEFT – Portfolio */}
+        {/* LEFT */}
         <div className="panel">
           <div className="portfolio-value">
             <div className="pv-label">TOTAL PORTFOLIO VALUE</div>
@@ -716,17 +750,20 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
           </div>
           <div className="panel-header">
             <div className="panel-title">Holdings</div>
-            <div className="tag live">● LIVE</div>
+            <div className="tag live">LIVE</div>
           </div>
           <div className="panel-scroll">
-            {PORTFOLIO.map(coin => {
+            {PORTFOLIO.map((coin: Coin) => {
               const value = coin.amount * coin.price;
               const pos = coin.change >= 0;
               return (
                 <div
                   key={coin.id}
                   className={`holding-card ${selectedCoin?.id === coin.id ? "selected" : ""}`}
-                  onClick={() => { setSelectedCoin(coin); sendMessage(`Give me a detailed analysis of ${coin.name} (${coin.symbol}) and my position.`); }}
+                  onClick={() => {
+                    setSelectedCoin(coin);
+                    sendMessage(`Give me a detailed analysis of ${coin.name} (${coin.symbol}) and my position.`);
+                  }}
                 >
                   <div className="coin-icon" style={{ border: `1px solid ${coin.color}22` }}>{coin.icon}</div>
                   <div>
@@ -745,21 +782,21 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
           </div>
         </div>
 
-        {/* CENTER – Chat / Activity */}
+        {/* CENTER */}
         <div className="chat-area">
           <div className="chat-tabs">
-            {["chat", "activity"].map(t => (
+            {["chat", "activity"].map((t: string) => (
               <div key={t} className={`chat-tab ${activeTab === t ? "active" : ""}`} onClick={() => setActiveTab(t)}>
-                {t === "chat" ? "🤖 AI Agent" : "📋 Activity"}
+                {t === "chat" ? "AI Agent" : "Activity"}
               </div>
             ))}
           </div>
 
           <div className={`tab-content ${activeTab === "chat" ? "active" : ""}`}>
             <div className="messages">
-              {messages.map(msg => (
+              {messages.map((msg: Message) => (
                 <div key={msg.id} className={`msg ${msg.role}`}>
-                  <div className={`msg-avatar ${msg.role}`}>{msg.role === "ai" ? "⬡" : "👤"}</div>
+                  <div className={`msg-avatar ${msg.role}`}>{msg.role === "ai" ? "N" : "U"}</div>
                   <div>
                     <div className={`msg-bubble ${msg.role}`}>
                       <MessageContent
@@ -775,7 +812,7 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
               ))}
               {loading && (
                 <div className="msg ai">
-                  <div className="msg-avatar ai">⬡</div>
+                  <div className="msg-avatar ai">N</div>
                   <div className="msg-bubble ai">
                     <div className="typing">
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
@@ -788,7 +825,7 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
 
             <div className="input-area">
               <div className="quick-cmds">
-                {QUICK_CMDS.map((cmd, i) => (
+                {QUICK_CMDS.map((cmd: string, i: number) => (
                   <button key={i} className="quick-cmd" onClick={() => sendMessage(cmd)}>{cmd}</button>
                 ))}
               </div>
@@ -798,12 +835,12 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
                   className="chat-input"
                   placeholder="Ask anything - analyze, trade, strategize..."
                   value={input}
-                  onChange={e => setInput(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={1}
                 />
                 <button className="send-btn" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
-                  ↑
+                  ^
                 </button>
               </div>
             </div>
@@ -812,10 +849,10 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
           <div className={`tab-content ${activeTab === "activity" ? "active" : ""}`}>
             <div className="panel-scroll" style={{ padding: "16px 20px" }}>
               <div className="strategy-alert">
-                <div className="sa-header">⚡ AGENT ALERT</div>
+                <div className="sa-header">AGENT ALERT</div>
                 <div className="sa-body">SOL momentum is accelerating. RSI at 68, approaching overbought. Consider taking 20% profits or setting a trailing stop at $165.</div>
               </div>
-              {ACTIVITIES.map((a, i) => (
+              {ACTIVITIES.map((a: ActivityItem, i: number) => (
                 <div key={i} className="activity-item">
                   <div className={`activity-icon ${a.type}`}>{a.icon}</div>
                   <div className="activity-detail">
@@ -829,11 +866,11 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
           </div>
         </div>
 
-        {/* RIGHT – Market */}
+        {/* RIGHT */}
         <div className="panel">
           <div className="panel-header">
             <div className="panel-title">Market</div>
-            <div className="tag live">● LIVE</div>
+            <div className="tag live">LIVE</div>
           </div>
           <div className="panel-scroll">
             <div className="metric-grid">
@@ -859,7 +896,6 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
               </div>
             </div>
 
-            {/* Fear & Greed */}
             <div className="market-section">
               <div className="market-section-title">SENTIMENT</div>
               <div className="fg-meter">
@@ -873,8 +909,7 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
                   </defs>
                   <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="#1e2d3d" strokeWidth="8" />
                   <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="url(#fg)" strokeWidth="8" strokeDasharray="157" strokeDashoffset="47" strokeLinecap="round" />
-                  <line x1="60" y1="60" x2="60" y2="22" stroke="#fff" strokeWidth="2" strokeLinecap="round"
-                    transform="rotate(26, 60, 60)" />
+                  <line x1="60" y1="60" x2="60" y2="22" stroke="#fff" strokeWidth="2" strokeLinecap="round" transform="rotate(26, 60, 60)" />
                   <circle cx="60" cy="60" r="4" fill="#fff" />
                 </svg>
                 <div className="fg-label">72</div>
@@ -885,13 +920,11 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
 
             <div className="market-section">
               <div className="market-section-title">TOP COINS</div>
-              {MARKET.map(coin => (
+              {MARKET.map((coin: MarketCoin) => (
                 <div key={coin.symbol} className="market-row" onClick={() => sendMessage(`Tell me about ${coin.name} (${coin.symbol}) - current price, recent trend, and should I buy?`)}>
                   <div className="market-row-left">
                     <div className="market-coin-icon">{coin.icon}</div>
-                    <div>
-                      <div className="market-name">{coin.symbol}</div>
-                    </div>
+                    <div className="market-name">{coin.symbol}</div>
                   </div>
                   <div>
                     <div className="market-price">${coin.price.toLocaleString()}</div>
@@ -904,11 +937,11 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
             <div className="market-section">
               <div className="market-section-title">AI STRATEGIES</div>
               <div className="strategy-alert">
-                <div className="sa-header">🎯 DCA ACTIVE</div>
+                <div className="sa-header">DCA ACTIVE</div>
                 <div className="sa-body">Weekly BTC DCA running. Next buy: $500 on Monday. 12-week avg: $64,200.</div>
               </div>
               <div className="strategy-alert" style={{ borderColor: "rgba(0,136,255,0.3)", background: "rgba(0,136,255,0.06)" }}>
-                <div className="sa-header" style={{ color: "var(--accent2)" }}>💡 OPPORTUNITY</div>
+                <div className="sa-header" style={{ color: "var(--accent2)" }}>OPPORTUNITY</div>
                 <div className="sa-body">ETH/BTC ratio at 6-month low. Historically bullish for ETH. Consider rotating 5% BTC to ETH.</div>
               </div>
             </div>
@@ -916,7 +949,6 @@ Format trade triggers like: [TRADE: type=buy, symbol=BTC, amount=0.01, price=672
         </div>
       </main>
 
-      {/* Notification */}
       {notification && (
         <div className="notif">
           <div className="notif-title">{notification.title}</div>
