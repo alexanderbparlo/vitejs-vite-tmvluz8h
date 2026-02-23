@@ -11,17 +11,21 @@ function signRequest(
 ): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const message = timestamp + method.toUpperCase() + path + body;
-  const signature = crypto
-    .createHmac("sha256", apiSecret)
-    .update(message)
-    .digest("hex");
-
+  const signature = crypto.createHmac("sha256", apiSecret).update(message).digest("hex");
   return {
     "CB-ACCESS-KEY": apiKey,
     "CB-ACCESS-SIGN": signature,
     "CB-ACCESS-TIMESTAMP": timestamp,
     "Content-Type": "application/json",
   };
+}
+
+interface TradeOrderResponse {
+  order_id?: string;
+  success_response?: { order_id?: string };
+  status?: string;
+  error?: string;
+  error_response?: { message?: string };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -35,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.COINBASE_API_KEY ?? "";
   const apiSecret = process.env.COINBASE_API_SECRET ?? "";
 
-  const { type, symbol, amount } = req.body;
+  const { type, symbol, amount } = req.body as { type: string; symbol: string; amount: number };
 
   if (!type || !symbol || !amount) {
     return res.status(400).json({ error: "Missing required fields: type, symbol, amount" });
@@ -53,7 +57,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       side: type.toUpperCase(),
       order_configuration: {
         market_market_ioc: {
-          // For buys, specify quote_size (USD amount); for sells, specify base_size (coin amount)
           ...(type === "buy"
             ? { quote_size: String(amount) }
             : { base_size: String(amount) }),
@@ -68,10 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: orderBody,
     });
 
-    const data = await response.json();
+    const data = await response.json() as TradeOrderResponse;
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data });
+      const errorMsg = data.error_response?.message ?? data.error ?? "Trade failed";
+      return res.status(response.status).json({ error: errorMsg });
     }
 
     return res.status(200).json({
