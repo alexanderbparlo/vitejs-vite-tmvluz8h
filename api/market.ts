@@ -47,16 +47,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.COINBASE_API_KEY ?? "";
   const apiSecret = process.env.COINBASE_API_SECRET ?? "";
 
+  if (!apiKey || !apiSecret) {
+    return res.status(500).json({ error: "Coinbase credentials not configured", hasKey: !!apiKey, hasSecret: !!apiSecret });
+  }
+
   try {
     const productIds = TOP_COINS.join("&product_ids=");
     const path = `/api/v3/brokerage/products?product_ids=${productIds}`;
     const headers = signRequest("GET", path, "", apiKey, apiSecret);
 
     const response = await fetch(`https://api.coinbase.com${path}`, { headers });
-    const data = await response.json() as CoinbaseProductsResponse;
+    const rawText = await response.text();
+
+    let data: CoinbaseProductsResponse;
+    try {
+      data = JSON.parse(rawText) as CoinbaseProductsResponse;
+    } catch {
+      return res.status(500).json({ error: "Coinbase returned invalid JSON", raw: rawText.slice(0, 500) });
+    }
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data });
+      return res.status(response.status).json({
+        error: "Coinbase API error",
+        status: response.status,
+        details: data,
+      });
     }
 
     const market = (data.products ?? []).map((p: CoinbaseProduct) => ({
@@ -68,7 +83,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ market });
   } catch (err) {
-    console.error("Market data error:", err);
-    return res.status(500).json({ error: "Failed to fetch market data" });
+    return res.status(500).json({ error: "Failed to fetch market data", details: String(err) });
   }
 }
