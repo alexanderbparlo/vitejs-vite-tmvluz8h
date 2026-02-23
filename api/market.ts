@@ -10,11 +10,7 @@ function signRequest(
 ): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const message = timestamp + method.toUpperCase() + path + body;
-  const signature = crypto
-    .createHmac("sha256", apiSecret)
-    .update(message)
-    .digest("hex");
-
+  const signature = crypto.createHmac("sha256", apiSecret).update(message).digest("hex");
   return {
     "CB-ACCESS-KEY": apiKey,
     "CB-ACCESS-SIGN": signature,
@@ -28,6 +24,17 @@ const TOP_COINS = [
   "XRP-USD", "DOGE-USD", "AVAX-USD", "DOT-USD",
   "LINK-USD", "ADA-USD",
 ];
+
+interface CoinbaseProduct {
+  product_id: string;
+  price: string;
+  price_percentage_change_24h: string;
+  volume_24h: string;
+}
+
+interface CoinbaseProductsResponse {
+  products?: CoinbaseProduct[];
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN ?? "*");
@@ -46,18 +53,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const headers = signRequest("GET", path, "", apiKey, apiSecret);
 
     const response = await fetch(`https://api.coinbase.com${path}`, { headers });
-    const data = await response.json();
+    const data = await response.json() as CoinbaseProductsResponse;
 
     if (!response.ok) {
       return res.status(response.status).json({ error: data });
     }
 
-    const market = (data.products ?? []).map((p: {
-      product_id: string;
-      price: string;
-      price_percentage_change_24h: string;
-      volume_24h: string;
-    }) => ({
+    const market = (data.products ?? []).map((p: CoinbaseProduct) => ({
       symbol: p.product_id.replace("-USD", ""),
       price: parseFloat(p.price ?? "0"),
       change: parseFloat(p.price_percentage_change_24h ?? "0"),
