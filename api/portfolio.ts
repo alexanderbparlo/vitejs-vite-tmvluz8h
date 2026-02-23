@@ -45,17 +45,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiSecret = process.env.COINBASE_API_SECRET ?? "";
 
   if (!apiKey || !apiSecret) {
-    return res.status(500).json({ error: "Coinbase credentials not configured" });
+    return res.status(500).json({ error: "Coinbase credentials not configured", hasKey: !!apiKey, hasSecret: !!apiSecret });
   }
 
   try {
     const path = "/api/v3/brokerage/accounts";
     const headers = signRequest("GET", path, "", apiKey, apiSecret);
     const accountsRes = await fetch(`https://api.coinbase.com${path}`, { headers });
-    const accountsData = await accountsRes.json() as CoinbaseAccountsResponse;
+    const rawText = await accountsRes.text();
+
+    let accountsData: CoinbaseAccountsResponse;
+    try {
+      accountsData = JSON.parse(rawText) as CoinbaseAccountsResponse;
+    } catch {
+      return res.status(500).json({ error: "Coinbase returned invalid JSON", raw: rawText.slice(0, 500) });
+    }
 
     if (!accountsRes.ok) {
-      return res.status(accountsRes.status).json({ error: accountsData });
+      return res.status(accountsRes.status).json({
+        error: "Coinbase API error",
+        status: accountsRes.status,
+        details: accountsData,
+      });
     }
 
     const accounts = (accountsData.accounts ?? []).filter(
@@ -91,7 +102,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalValue = portfolio.reduce((sum: number, h: { value: number }) => sum + h.value, 0);
     return res.status(200).json({ portfolio, totalValue });
   } catch (err) {
-    console.error("Coinbase portfolio error:", err);
-    return res.status(500).json({ error: "Failed to fetch portfolio" });
+    return res.status(500).json({ error: "Failed to fetch portfolio", details: String(err) });
   }
 }
